@@ -12,8 +12,12 @@ on:
         required: false
         type: string
         default: 'linux/amd64'
-      environment:
-        description: 'GitHub environment name (production, staging, etc.)'
+      build-environment:
+        description: 'GitHub environment name for the build job'
+        required: true
+        type: string
+      production-environment:
+        description: 'GitHub environment name for the production deploy job (must have required reviewers configured)'
         required: true
         type: string
     secrets:
@@ -26,14 +30,21 @@ on:
       github-packages-token:
         description: 'GitHub packages token for private dependencies'
         required: false
+    outputs:
+      image:
+        description: 'Full image name with tag'
+        value: ${{ jobs.build.outputs.image }}
 
 jobs:
-  build-and-push:
+  build:
     name: Build and Push
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.build-environment }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+      is-release: ${{ steps.tag.outputs.is-release }}
 
     steps:
       - name: Checkout code
@@ -45,8 +56,10 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "value=release-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "is-release=true" >> $GITHUB_OUTPUT
           else
             echo "value=development-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "is-release=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Log in to DockerHub
@@ -88,3 +101,20 @@ jobs:
           echo "🚀 Image pushed successfully!"
           echo "📦 Image: ${{ steps.build-image.outputs.image }}"
           echo "🔗 View on DockerHub: https://hub.docker.com/r/${{ inputs.dockerhub-image }}/tags"
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    if: needs.build.outputs.is-release == 'true'
+    environment: ${{ inputs.production-environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Production deployment placeholder
+        run: |
+          echo "✅ Approved for production!"
+          echo "📦 Image: ${{ needs.build.outputs.image }}"
+          echo "🌍 Environment: ${{ inputs.production-environment }}"
+          echo "⏳ Deployment step not yet configured."
