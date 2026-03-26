@@ -12,12 +12,12 @@ on:
         required: false
         type: string
         default: 'linux/amd64'
-      build-environment:
-        description: 'GitHub environment name for the build job'
+      development-environment:
+        description: 'GitHub environment name for dev deploy (must have required reviewers configured)'
         required: true
         type: string
       production-environment:
-        description: 'GitHub environment name for the production deploy job (must have required reviewers configured)'
+        description: 'GitHub environment name for production deploy (must have required reviewers configured)'
         required: true
         type: string
     secrets:
@@ -38,7 +38,6 @@ on:
 jobs:
   build:
     name: Build and Push
-    environment: ${{ inputs.build-environment }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -53,12 +52,12 @@ jobs:
       - name: Resolve image tag
         id: tag
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          SHA="${{ github.sha }}"
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "value=release-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "value=release-${SHA}" >> $GITHUB_OUTPUT
             echo "is-release=true" >> $GITHUB_OUTPUT
           else
-            echo "value=development-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "value=development-${SHA}" >> $GITHUB_OUTPUT
             echo "is-release=false" >> $GITHUB_OUTPUT
           fi
 
@@ -101,6 +100,23 @@ jobs:
           echo "🚀 Image pushed successfully!"
           echo "📦 Image: ${{ steps.build-image.outputs.image }}"
           echo "🔗 View on DockerHub: https://hub.docker.com/r/${{ inputs.dockerhub-image }}/tags"
+
+  deploy-development:
+    name: Deploy to Development
+    needs: build
+    if: needs.build.outputs.is-release == 'false'
+    environment: ${{ inputs.development-environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Development deployment placeholder
+        run: |
+          echo "✅ Approved for development!"
+          echo "📦 Image: ${{ needs.build.outputs.image }}"
+          echo "🌍 Environment: ${{ inputs.development-environment }}"
+          echo "⏳ Deployment step not yet configured."
 
   deploy-production:
     name: Deploy to Production
