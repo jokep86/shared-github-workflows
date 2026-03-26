@@ -1,0 +1,62 @@
+name: Promote to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      dockerhub-image:
+        description: 'DockerHub image name (e.g., myusername/myimage)'
+        required: true
+        type: string
+      image-tag:
+        description: 'Release tag to promote (must start with "release-")'
+        required: true
+        type: string
+      environment:
+        description: 'GitHub environment name'
+        required: true
+        type: string
+        default: 'production'
+
+jobs:
+  promote:
+    name: Promote to Production
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: List available release tags
+        run: |
+          echo "📋 Available release tags for ${{ inputs.dockerhub-image }}:"
+          curl -s "https://hub.docker.com/v2/repositories/${{ inputs.dockerhub-image }}/tags?page_size=100" \
+            | grep -o '"name":"[^"]*"' \
+            | cut -d'"' -f4 \
+            | grep '^release-' \
+            | sort \
+            || echo "⚠️ Could not fetch tags (image may be private or not exist)"
+
+      - name: Validate tag starts with "release-"
+        run: |
+          if [[ "${{ inputs.image-tag }}" != release-* ]]; then
+            echo "❌ Tag '${{ inputs.image-tag }}' is not a release tag. Only tags starting with 'release-' can be promoted to production."
+            exit 1
+          fi
+          echo "✅ Tag format is valid: ${{ inputs.image-tag }}"
+
+      - name: Validate image exists on DockerHub
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://hub.docker.com/v2/repositories/${{ inputs.dockerhub-image }}/tags/${{ inputs.image-tag }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Image ${{ inputs.dockerhub-image }}:${{ inputs.image-tag }} not found on DockerHub (HTTP $STATUS)"
+            exit 1
+          fi
+          echo "✅ Image confirmed: ${{ inputs.dockerhub-image }}:${{ inputs.image-tag }}"
+
+      - name: Production deployment placeholder
+        run: |
+          echo "🚀 Ready to deploy to production!"
+          echo "📦 Image: ${{ inputs.dockerhub-image }}:${{ inputs.image-tag }}"
+          echo "🌍 Environment: ${{ inputs.environment }}"
+          echo "⏳ Deployment step not yet configured."
